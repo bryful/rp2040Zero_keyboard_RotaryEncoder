@@ -187,13 +187,13 @@ enum ActiveMode
   MODE_ILLUSTRATOR,
   NUM_MODES
 };
-uint8_t currentMode = MODE_DEFAULT;
+uint8_t currentMode = MODE_PHOTOSHOP;
 
 // Auto-generated key configuration
 // Generated at: 2026-05-18 17:40:56
 
 // #define NUM_MODES 3
-// #define ENCODER_COUNT 2
+#define ENCODER_COUNT 2
 
 KeyConfig keyMaps[NUM_MODES][4][5] = {
     {{{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
@@ -222,6 +222,8 @@ KeyConfig encoderMaps[NUM_MODES][ENCODER_COUNT][3] = {
      {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}},
      // Enc1
      {{KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_H, NONE}, {0, HID_KEY_V, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_1, NONE}}}};
+
+// constexpr int ENCODER_COUNT = sizeof(encoders) / sizeof(encoders[0]);
 
 /*
 // マトリクスキーマップ (4行x5列 x 4モード)
@@ -256,7 +258,6 @@ RotaryEncoder encoders[] = {
     {11, 12, 13, LOW, true}, // エンコーダ1 (Enc0)
     {14, 15, 26, LOW, true}  // エンコーダ2 (Enc1)
 };
-constexpr int ENCODER_COUNT = sizeof(encoders) / sizeof(encoders[0]);
 
 // 【新規追加】エンコーダー用の4モードマップ定義 [モード][エンコーダ番号][0:CW / 1:CCW / 2:SW]
 /*
@@ -301,18 +302,15 @@ void updateModeLED()
 {
   switch (currentMode)
   {
-  case MODE_DEFAULT:
-    setLed(COLOR_OFF);
-    break; // 固定キー: 緑
   case MODE_PHOTOSHOP:
-    setLed(COLOR_DARK_BLUE);
+    setLed(COLOR_OFF);
     break; // Photoshop: 青
   case MODE_AFTEREFFECTS:
-    setLed(COLOR_DARK_MAGENTA);
+    setLed(COLOR_DARK_BLUE);
     break; // AfterEffects: マゼンタ
-  case MODE_CUSTOM:
+  case MODE_ILLUSTRATOR:
     setLed(COLOR_DARK_YELLOW);
-    break; // 予備: 黄
+    break; // Illustrator: 黄
   }
 }
 
