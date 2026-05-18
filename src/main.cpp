@@ -100,18 +100,6 @@ SW	GP26
 #include <Adafruit_NeoPixel.h>
 #include "USBHIDKeyboard_JIS.h"
 
-/*
-4x5 キーマトリクス (Row出力 / Col入力 反転対応版)
-Rows（出力） -> GP2, GP3, GP4, GP5
-Cols（入力_PULLUP） -> GP6, GP7, GP8, GP9, GP10
-
-ロータリーエンコーダ1 (Enc0)
-CLK: GP11, DT: GP12, SW: GP13
-
-ロータリーエンコーダ2 (Enc1)
-CLK: GP14, DT: GP15, SW: GP26
-*/
-
 // ============================================
 // WS2812
 // ============================================
@@ -172,6 +160,12 @@ struct RotaryEncoder
   uint8_t pinSW;
   int lastStateA;
   bool swOldState;
+
+  // キュー処理用メンバ
+  int pulseQueue;       // 溜まったパルス数（正:右, 負:左）
+  uint32_t activeTimer; // キーを押し下げているタイマー
+  bool isKeyActive;     // 現在エンコーダ由来のキーがONか
+  KeyConfig activeCfg;  // 現在ONにしているキー設定
 };
 
 // モード切替用の特殊キー定義 (%1として使用)
@@ -189,10 +183,6 @@ enum ActiveMode
 };
 uint8_t currentMode = MODE_PHOTOSHOP;
 
-// Auto-generated key configuration
-// Generated at: 2026-05-18 17:40:56
-
-// #define NUM_MODES 3
 #define ENCODER_COUNT 2
 
 KeyConfig keyMaps[NUM_MODES][4][5] = {
@@ -225,70 +215,48 @@ KeyConfig encoderMaps[NUM_MODES][ENCODER_COUNT][3] = {
 
 // constexpr int ENCODER_COUNT = sizeof(encoders) / sizeof(encoders[0]);
 
-/*
-// マトリクスキーマップ (4行x5列 x 4モード)
-KeyConfig keyMaps[NUM_MODES][4][5] = {
-    // --- 0. 固定キー (Default) ---
-    {
-        {{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_S, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Y, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, 0, MOUSE_R}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}},
-    // --- 1. PhotoShop ---
-    {
-        {{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_S, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_A, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_I, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_DELETE, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Y, NONE}, {0, HID_KEY_B, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, 0, MOUSE_R}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}},
-    // --- 2. AfterEffects ---
-    {
-        {{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_S, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_D, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE}, {0, HID_KEY_0, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Y, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTALT, HID_KEY_0, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, 0, MOUSE_R}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}},
-    // --- 3. Custom ---
-    {
-        {{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_S, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Y, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, 0, MOUSE_R}},
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}}};
-*/
 // エンコーダーのハードウェア接続設定
 RotaryEncoder encoders[] = {
-    {11, 12, 13, LOW, true}, // エンコーダ1 (Enc0)
-    {14, 15, 26, LOW, true}  // エンコーダ2 (Enc1)
+    {11, 12, 13, LOW, true, 0, 0}, // エンコーダ1 (Enc0)
+    {14, 15, 26, LOW, true, 0, 0}  // エンコーダ2 (Enc1)};
 };
-
-// 【新規追加】エンコーダー用の4モードマップ定義 [モード][エンコーダ番号][0:CW / 1:CCW / 2:SW]
-/*
-KeyConfig encoderMaps[NUM_MODES][ENCODER_COUNT][3] = {
-    // --- 0. 固定キー (Default) ---
-    {
-        // Enc0 (CW: PgUp, CCW: PgDn, SW: Ctrl+C)
-        {{0, HID_KEY_PAGEUP, NONE}, {0, HID_KEY_PAGEDOWN, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}},
-        // Enc1 (CW: ↑, CCW: ↓, SW: 左クリック)
-        {{0, HID_KEY_ARROWUP, NONE}, {0, HID_KEY_ARROWDOWN, NONE}, {0, 0, MOUSE_L}}},
-    // --- 1. PhotoShop ---
-    {
-        // Enc0 (例: 拡大 [Ctrl + +], 縮小 [Ctrl + -], SW: 手のひら [Space])
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE}, {0, HID_KEY_SPACE, NONE}},
-        // Enc1 (例: ブラシサイズ大きく [ ], 小さく [ [ ], SW: 左クリック)
-        {{0, HID_KEY_RIGHTBRACE, NONE}, {0, HID_KEY_LEFTBRACE, NONE}, {0, 0, MOUSE_L}}},
-    // --- 2. AfterEffects ---
-    {
-        // Enc0 (例: 1フレーム進む [Ctrl + →], 1フレーム戻る [Ctrl + ←], SW: 再生/停止 [Space])
-        {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_ARROWRIGHT, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_ARROWLEFT, NONE}, {0, HID_KEY_SPACE, NONE}},
-        // Enc1 (例: タイムライン拡大 [^], 縮小 [-], SW: 左クリック)
-        {{0, HID_KEY_CARET, NONE}, {0, HID_KEY_MINUS, NONE}, {0, 0, MOUSE_L}}},
-    // --- 3. Custom (予備: 必要に応じて書き換えてください) ---
-    {
-        // Enc0
-        {{0, HID_KEY_PAGEUP, NONE}, {0, HID_KEY_PAGEDOWN, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}},
-        // Enc1
-        {{0, HID_KEY_ARROWUP, NONE}, {0, HID_KEY_ARROWDOWN, NONE}, {0, 0, MOUSE_L}}}};
-*/
 bool keyState[4][5] = {false};
+// ============================================
+// 【新規】同時押し用 一括送信レポートバッファ
+// ============================================
+uint8_t currentReportModifier = 0;
+uint8_t currentReportKeys[6] = {0};
 
+// マウスボタン個別追跡用フラグ
+bool currentMouseL = false;
+bool currentMouseR = false;
+bool currentMouseM = false;
+
+// バッファに通常キーを安全に追加する関数（最大6個まで）
+void addKeyToReport(uint8_t keycode)
+{
+  if (keycode == HID_KEY_NONE)
+    return;
+  for (int i = 0; i < 6; i++)
+  {
+    if (currentReportKeys[i] == keycode)
+      return;
+    if (currentReportKeys[i] == 0)
+    {
+      currentReportKeys[i] = keycode;
+      return;
+    }
+  }
+}
+void addMouseToReport(ClickType mouseButton)
+{
+  if (mouseButton == MOUSE_L)
+    currentMouseL = true;
+  if (mouseButton == MOUSE_R)
+    currentMouseR = true;
+  if (mouseButton == MOUSE_M)
+    currentMouseM = true;
+}
 // ============================================
 // LED制御関数
 // ============================================
@@ -313,10 +281,37 @@ void updateModeLED()
     break; // Illustrator: 黄
   }
 }
+// ============================================
+// HID送信コア関数（一括レポート送信仕様）
+// ============================================
+void sendReportFinal()
+{
+  CoreMutex m(&__usb_mutex);
+  tud_task();
+  if (!__USBHIDReady())
+    return;
 
+  tud_hid_keyboard_report(__USBGetKeyboardReportID(), currentReportModifier, currentReportKeys);
+
+  if (currentMouseL)
+    Mouse.press(MOUSE_LEFT);
+  else
+    Mouse.release(MOUSE_LEFT);
+  if (currentMouseR)
+    Mouse.press(MOUSE_RIGHT);
+  else
+    Mouse.release(MOUSE_RIGHT);
+  if (currentMouseM)
+    Mouse.press(MOUSE_MIDDLE);
+  else
+    Mouse.release(MOUSE_MIDDLE);
+
+  tud_task();
+}
 // ============================================
 // HID送信コア関数
 // ============================================
+/*
 void sendHIDReport(uint8_t modifier, uint8_t keycode, ClickType mouseButton, bool isPressed)
 {
   CoreMutex m(&__usb_mutex);
@@ -356,7 +351,7 @@ void tapKey(KeyConfig cfg)
   delay(10);
   sendHIDReport(cfg.modifier, cfg.keycode, cfg.mouse, false);
 }
-
+*/
 // ============================================
 // 監視ロジック
 // ============================================
@@ -366,36 +361,76 @@ void updateEncoders()
   {
     auto &enc = encoders[i];
 
-    // 回転検出
+    // --- 1. 回転のエッジ検出 (高速回転でもキューに溜めて絶対に取りこぼさない) ---
     int currentStateA = digitalRead(enc.pinA);
     if (currentStateA != enc.lastStateA && currentStateA == LOW)
     {
       if (digitalRead(enc.pinB) != currentStateA)
       {
-        // 現在のモードのCW(0)を送信
-        tapKey(encoderMaps[currentMode][i][0]);
-      }
+        enc.pulseQueue++;
+      } // 右回転をストック
       else
       {
-        // 現在のモードのCCW(1)を送信
-        tapKey(encoderMaps[currentMode][i][1]);
-      }
+        enc.pulseQueue--;
+      } // 左回転をストック
     }
     enc.lastStateA = currentStateA;
 
-    // スイッチ（押し込み）検出
-    bool swState = digitalRead(enc.pinSW);
-    if (enc.swOldState == HIGH && swState == LOW)
+    // --- 2. ストックされたパルスの処理（キーのON/OFF管理） ---
+    if (enc.isKeyActive)
     {
-      // 現在のモードのSW(2)をPress
-      KeyConfig cfg = encoderMaps[currentMode][i][2];
-      sendHIDReport(cfg.modifier, cfg.keycode, cfg.mouse, true);
+      // キーの押し下げ時間が20msを超えたら一旦離す（OSが認識するのに最適な時間）
+      if (millis() - enc.activeTimer >= 20)
+      {
+        enc.isKeyActive = false;
+      }
+      else
+      {
+        // 20ms経過するまでは、現在のキー状態を維持してバッファに載せ続ける
+        currentReportModifier |= enc.activeCfg.modifier;
+        addKeyToReport(enc.activeCfg.keycode);
+        if (enc.activeCfg.mouse != NONE)
+          addMouseToReport(enc.activeCfg.mouse);
+      }
     }
-    else if (enc.swOldState == LOW && swState == HIGH)
+    else
     {
-      // 現在のモードのSW(2)をRelease
+      // キューに未処理の回転が溜まっていて、かつ前回のキーが解除されていれば次のパルスを処理
+      if (enc.pulseQueue != 0)
+      {
+        if (enc.pulseQueue > 0)
+        {
+          enc.activeCfg = encoderMaps[currentMode][i][0]; // CW
+          enc.pulseQueue--;
+        }
+        else
+        {
+          enc.activeCfg = encoderMaps[currentMode][i][1]; // CCW
+          enc.pulseQueue++;
+        }
+
+        enc.isKeyActive = true;
+        enc.activeTimer = millis();
+        lastInputTime = millis();
+
+        // 最初の1フレーム目としてバッファに載せる
+        currentReportModifier |= enc.activeCfg.modifier;
+        addKeyToReport(enc.activeCfg.keycode);
+        if (enc.activeCfg.mouse != NONE)
+          addMouseToReport(enc.activeCfg.mouse);
+      }
+    }
+
+    // --- 3. スイッチ（押し込み）検出 ---
+    bool swState = digitalRead(enc.pinSW);
+    if (swState == LOW)
+    {
       KeyConfig cfg = encoderMaps[currentMode][i][2];
-      sendHIDReport(cfg.modifier, cfg.keycode, cfg.mouse, false);
+      currentReportModifier |= cfg.modifier;
+      addKeyToReport(cfg.keycode);
+      if (cfg.mouse != NONE)
+        addMouseToReport(cfg.mouse);
+      lastInputTime = millis();
     }
     enc.swOldState = swState;
   }
@@ -411,31 +446,29 @@ void updateKeyMatrix()
     for (int c = 0; c < 5; c++)
     {
       bool isPressed = (digitalRead(colPins[c]) == LOW);
-      if (isPressed != keyState[r][c])
+
+      if (isPressed)
       {
         KeyConfig cfg = keyMaps[currentMode][r][c];
 
-        if (isPressed)
+        if (cfg.keycode == KEY_MODE_CHANGE)
         {
-          if (cfg.keycode == KEY_MODE_CHANGE)
+          if (keyState[r][c] == false)
           {
             currentMode = (currentMode + 1) % NUM_MODES;
             updateModeLED();
           }
-          else
-          {
-            sendHIDReport(cfg.modifier, cfg.keycode, cfg.mouse, true);
-          }
         }
         else
         {
-          if (cfg.keycode != KEY_MODE_CHANGE)
-          {
-            sendHIDReport(cfg.modifier, cfg.keycode, cfg.mouse, false);
-          }
+          currentReportModifier |= cfg.modifier;
+          addKeyToReport(cfg.keycode);
+          if (cfg.mouse != NONE)
+            addMouseToReport(cfg.mouse);
+          lastInputTime = millis();
         }
-        keyState[r][c] = isPressed;
       }
+      keyState[r][c] = isPressed;
     }
     digitalWrite(rowPins[r], HIGH);
     pinMode(rowPins[r], INPUT_PULLUP);
@@ -454,7 +487,11 @@ void handleScreensaver()
   if ((millis() - lastInputTime) >= SCREENSAVER_TIMEOUT_MS)
   {
     uint32_t prevColor = led.getPixelColor(0);
+    setLed(COLOR_OFF);
+    delay(100);
     setLed(COLOR_WHITE);
+    delay(100);
+    setLed(COLOR_OFF);
     delay(100);
     setLed(prevColor);
     sendMouseJiggle();
@@ -516,8 +553,20 @@ void setup()
 
 void loop()
 {
+  // 1. 毎フレームレポートバッファをリセット
+  currentReportModifier = 0;
+  memset(currentReportKeys, 0, sizeof(currentReportKeys));
+  currentMouseL = false;
+  currentMouseR = false;
+  currentMouseM = false;
+
+  // 2. 現在の物理的な「押し下げ状態」をスキャンして蓄積
   updateEncoders();
   updateKeyMatrix();
+
+  // 3. 確定した最新レポートを一括でPCへ送信
+  sendReportFinal();
+
   handleScreensaver();
   delay(1);
 }
