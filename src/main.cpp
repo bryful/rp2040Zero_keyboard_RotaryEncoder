@@ -42,23 +42,38 @@ C4	GP10
 ┌─────┬─────┬─────┐─────┐─────┐
 │ ESC │ Copy│ Cut │Paste│  %1 │
 ├─────┼─────┼─────┼─────┼─────┤
-│ Save│Ctl+D│Ctl+A│S+C+I│Alt+Del│
+│  R  │Ctl+D│Ctl+A│S+C+I│Alt+Del│
 ├─────│─────┼─────┼─────┼─────┤
-│ Redo│  B  │  V  │  H  │  MR │
+│ Redo│  M  │  V  │  H  │  MR │
 ├─────│─────┼─────┼─────┼─────┤
 │ Undo│Shift│ Ctrl│ Alt │Space│
 └─────┴─────┴─────┴─────┴─────┘
+RE1 Ctrl+k+ Ctrl+k- Ctrl+0
+RE2 [ ] B
 // AfterEffectsのショートカット
 ┌─────┬─────┬─────┐─────┐─────┐
 │ ESC │ Copy│ Cut │Paste│  %1 │
 ├─────┼─────┼─────┼─────┼─────┤
-│ Save│Ctr+0│C+S+D│Ctr+D│  0  │
+│  *  │Ctr+0│C+S+D│Ctr+D│  0  │
 ├─────│─────┼─────┼─────┼─────┤
 │ Redo│C+A+0│  V  │  H  │  MR │
 ├─────│─────┼─────┼─────┼─────┤
 │ Undo│Shift│ Ctrl│ Alt │Space│
 └─────┴─────┴─────┴─────┴─────┘
-
+ビューzo,,, zi....
+タイムラインzo--- zi^^^
+// Illustratorのショートカット
+┌─────┬─────┬─────┐─────┐─────┐
+│ ESC │ Copy│ Cut │Paste│  %1 │
+├─────┼─────┼─────┼─────┼─────┤
+│  I  │  P  │ S+C │ S++ │  -  │
+├─────│─────┼─────┼─────┼─────┤
+│ Redo│  A  │  V  │  H  │  MR │
+├─────│─────┼─────┼─────┼─────┤
+│ Undo│Shift│ Ctrl│ Alt │Space│
+└─────┴─────┴─────┴─────┴─────┘
+RE2 Shift+H V Shift+Ctrl+1
+RE1 Ctrl+k+ Ctrl+k- Ctrl+0
 
 
 
@@ -167,14 +182,48 @@ struct RotaryEncoder
 // ============================================
 enum ActiveMode
 {
-  MODE_DEFAULT = 0,
-  MODE_PHOTOSHOP,
+  MODE_PHOTOSHOP = 0,
   MODE_AFTEREFFECTS,
-  MODE_CUSTOM,
+  MODE_ILLUSTRATOR,
   NUM_MODES
 };
 uint8_t currentMode = MODE_DEFAULT;
 
+// Auto-generated key configuration
+// Generated at: 2026-05-18 17:40:56
+
+// #define NUM_MODES 3
+// #define ENCODER_COUNT 2
+
+KeyConfig keyMaps[NUM_MODES][4][5] = {
+    {{{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
+     {{0, HID_KEY_R, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_A, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_I, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_DELETE, NONE}},
+     {{KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE}, {0, HID_KEY_M, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, HID_KEY_NONE, MOUSE_R}},
+     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}},
+    {{{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
+     {{0, HID_KEY_KP_ASTERISK, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_D, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE}, {0, HID_KEY_0, NONE}},
+     {{KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTALT, HID_KEY_0, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, HID_KEY_NONE, MOUSE_R}},
+     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}},
+    {{{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
+     {{0, HID_KEY_I, NONE}, {0, HID_KEY_P, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_KP_PLUS, NONE}, {0, HID_KEY_MINUS, NONE}},
+     {{KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE}, {0, HID_KEY_A, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, HID_KEY_NONE, MOUSE_R}},
+     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}}};
+
+KeyConfig encoderMaps[NUM_MODES][ENCODER_COUNT][3] = {
+    {// Enc0
+     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}},
+     // Enc1
+     {{0, HID_KEY_LEFTBRACE, NONE}, {0, HID_KEY_RIGHTBRACE, NONE}, {0, HID_KEY_B, NONE}}},
+    {// Enc0
+     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_MINUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_CARET, NONE}, {0, HID_KEY_NONE, NONE}},
+     // Enc1
+     {{0, HID_KEY_COMMA, NONE}, {0, HID_KEY_DOT, NONE}, {0, HID_KEY_NONE, NONE}}},
+    {// Enc0
+     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}},
+     // Enc1
+     {{KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_H, NONE}, {0, HID_KEY_V, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_1, NONE}}}};
+
+/*
 // マトリクスキーマップ (4行x5列 x 4モード)
 KeyConfig keyMaps[NUM_MODES][4][5] = {
     // --- 0. 固定キー (Default) ---
@@ -201,7 +250,7 @@ KeyConfig keyMaps[NUM_MODES][4][5] = {
         {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_S, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}},
         {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Y, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, HID_KEY_NONE, NONE}, {0, 0, MOUSE_R}},
         {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}}};
-
+*/
 // エンコーダーのハードウェア接続設定
 RotaryEncoder encoders[] = {
     {11, 12, 13, LOW, true}, // エンコーダ1 (Enc0)
@@ -210,6 +259,7 @@ RotaryEncoder encoders[] = {
 constexpr int ENCODER_COUNT = sizeof(encoders) / sizeof(encoders[0]);
 
 // 【新規追加】エンコーダー用の4モードマップ定義 [モード][エンコーダ番号][0:CW / 1:CCW / 2:SW]
+/*
 KeyConfig encoderMaps[NUM_MODES][ENCODER_COUNT][3] = {
     // --- 0. 固定キー (Default) ---
     {
@@ -235,7 +285,7 @@ KeyConfig encoderMaps[NUM_MODES][ENCODER_COUNT][3] = {
         {{0, HID_KEY_PAGEUP, NONE}, {0, HID_KEY_PAGEDOWN, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}},
         // Enc1
         {{0, HID_KEY_ARROWUP, NONE}, {0, HID_KEY_ARROWDOWN, NONE}, {0, 0, MOUSE_L}}}};
-
+*/
 bool keyState[4][5] = {false};
 
 // ============================================
