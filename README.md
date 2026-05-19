@@ -1,100 +1,159 @@
-# RP2040 Zero キーボード
+# RP2040 Zero Macro Keyboard + Dual Rotary Encoder
 
-Waveshare RP2040 Zero を使ったカスタム USB HID キーボードファームウェアです。
-最大14個のボタンを GPIO に接続し、キーコードを USB 経由でPCへ送信します。
-スクリーンセーバー対策の自動 ESC 送信機能も搭載しています。
+<img src=".\pict\a0.jpg"><br>
 
----
+Waveshare RP2040 Zero 用の USB HID マクロキーボードです。
+4x5 キーマトリクスと 2 基のロータリーエンコーダを入力として使い、
+Photoshop / After Effects / Illustrator の 3 モードでショートカットを送信します。
+<br>
+3dpフォルダの中に3Dプリンター用のデータも入れてあります。
+
+## 特徴
+
+- 4x5 キーマトリクス（20 キー）
+- ロータリーエンコーダ x2（回転 CW/CCW + 押し込み SW）
+- 3 つのアプリ向けキーマップモード
+- モード切替キー（%1）
+- USB HID キーボード + マウス右クリック送信
+- WS2812 (NeoPixel) 1 灯で状態表示
+- 一定時間無操作時のマウスジグル
+<img src=".\pict\a1.jpg"><br>
+<img src=".\pict\a2.jpg"><br>
+<img src=".\pict\a3.jpg"><br>
+<img src=".\pict\a4.jpg"><br>
 
 ## ハードウェア
 
-| 項目     | 内容                                            |
-| -------- | ----------------------------------------------- |
-| マイコン | Waveshare RP2040 Zero                           |
-| USB      | USB HID キーボード (TinyUSB, arduino-pico 内蔵) |
-| LED      | WS2812 RGB LED × 1（GPIO 16）                   |
-| ボタン   | タクトスイッチ × 最大14個（GPIO 2〜15）         |
-| 接続方式 | INPUT_PULLUP（GND 接地でON）                    |
+| 項目                 | 内容                                                       |
+| -------------------- | ---------------------------------------------------------- |
+| マイコン             | Waveshare RP2040 Zero                                      |
+| フレームワーク       | Arduino (PlatformIO)                                       |
+| USB                  | TinyUSB ベース HID（Keyboard/Mouse）                       |
+| LED                  | WS2812 x1（GPIO16）                                        |
+| キー入力             | 4x5 マトリクス（Rows: GPIO5,4,3,2 / Cols: GPIO6,7,8,9,10） |
+| ロータリーエンコーダ | 2 基（A/B/SW それぞれ GPIO 割当あり）                      |
 
----
+キー入力は INPUT_PULLUP 想定です（スイッチ押下で GND に落とす配線）。
 
-## ピンアサイン（14キー構成）
+## ピンアサイン
 
-| GPIO | キー                           | 種別     | LED色    |
-| ---- | ------------------------------ | -------- | -------- |
-| 2    | Space                          | 通常     | 黄       |
-| 3    | Alt                            | 通常     | マゼンタ |
-| 4    | Ctrl                           | 通常     | 緑       |
-| 5    | Shift                          | 通常     | 黄       |
-| 6    | Ctrl+V（ペースト）             | Ctrl複合 | 白       |
-| 7    | Ctrl+C（コピー）               | Ctrl複合 | シアン   |
-| 8    | Ctrl+テンキー+（ズームイン）   | Ctrl複合 | 青       |
-| 9    | Ctrl+テンキー−（ズームアウト） | Ctrl複合 | 青       |
-| 10   | Enter                          | 通常     | 白       |
-| 11   | Ctrl+X（カット）               | Ctrl複合 | 赤       |
-| 12   | `]`                            | 通常     | 緑       |
-| 13   | `[`                            | 通常     | 緑       |
-| 14   | Ctrl+Z（元に戻す）             | Ctrl複合 | 赤       |
-| 15   | Escape                         | 通常     | 赤       |
+### キーマトリクス
 
----
+| 種別 | GPIO           |
+| ---- | -------------- |
+| Row  | 5, 4, 3, 2     |
+| Col  | 6, 7, 8, 9, 10 |
+
+### ロータリーエンコーダ
+
+| エンコーダ | CLK(A) | DT(B) | SW  |
+| ---------- | ------ | ----- | --- |
+| Encoder 1  | 11     | 12    | 13  |
+| Encoder 2  | 14     | 15    | 26  |
+
+### LED
+
+| デバイス | GPIO |
+| -------- | ---- |
+| WS2812   | 16   |
+
+## モードとキーマップ
+
+モードは 3 つです。
+
+1. Photoshop
+2. After Effects
+3. Illustrator
+
+モード切替キー（%1）を押すと順番に切り替わります。
+
+### 共通キー（全モード共通）
+
+- ESC
+- Ctrl+C
+- Ctrl+X
+- Ctrl+V
+- Ctrl+Shift+Z（Redo）
+- Ctrl+Z（Undo）
+- Shift / Ctrl / Alt / Space
+- Mouse Right Click
+
+### ロータリーエンコーダ割り当て
+
+#### Photoshop
+
+- Enc0: CW = Ctrl+Keypad+, CCW = Ctrl+Keypad-, Push = Ctrl+0
+- Enc1: CW = [, CCW = ], Push = B
+
+#### After Effects
+
+- Enc0: CW = -, CCW = ^, Push = なし
+- Enc1: CW = ,, CCW = ., Push = なし
+
+#### Illustrator
+
+- Enc0: CW = Ctrl+Keypad+, CCW = Ctrl+Keypad-, Push = Ctrl+0
+- Enc1: CW = Shift+H, CCW = V, Push = Ctrl+Shift+1
 
 ## LED 動作
 
-| 状態       | 色                |
-| ---------- | ----------------- |
-| 起動中     | 赤                |
-| 起動完了   | 緑（1秒後に消灯） |
-| キー押下中 | キー固有の色      |
-| 無操作     | 消灯              |
-
----
+- 起動時: 赤
+- 起動完了時: 緑を点滅後にモード色へ遷移
+- モード表示
+  - Photoshop: 消灯
+  - After Effects: 暗い青
+  - Illustrator: 暗い黄
 
 ## スクリーンセーバー対策
 
-一定時間キー入力がなかった場合、自動的に **ESC キー** を押したことにして、スクリーンセーバーの起動を防ぎます。
+一定時間入力がない場合、マウスポインタを小さく往復移動させるマウスジグルを実行します。
 
-**タイムアウト設定:**
-`src/main.cpp` の下記定数を変更してください。
+デフォルトは 3 分です。
 
 ```cpp
-constexpr uint32_t SCREENSAVER_TIMEOUT_MS = 60000; // 1分（ミリ秒）
+constexpr uint32_t SCREENSAVER_TIMEOUT_MS = 60000 * 3;
 ```
 
----
+## ビルドと書き込み
 
-## ビルド・書き込み
+### 必要環境
 
-### 必要なもの
+- VS Code
+- PlatformIO 拡張
+- RP2040 Zero（BOOTSEL モードで書き込み）
 
-- [VS Code](https://code.visualstudio.com/) + [PlatformIO](https://platformio.org/) 拡張機能
-- Waveshare RP2040 Zero
-- USB ケーブル（Type-C）
-- [picotool](https://github.com/raspberrypi/picotool)（書き込みに使用）
+### PlatformIO 設定
 
-### 手順
+- board: waveshare_rp2040_zero
+- platform: raspberrypi
+- framework: arduino
+- upload_protocol: picotool
+- lib_deps: Adafruit NeoPixel
 
-1. VS Code でこのプロジェクトフォルダを開く
-2. **ビルド:** PlatformIO の「Build」ボタン、または `platformio run`
-3. **書き込み:** RP2040 Zero を BOOTSEL モードで接続し、「Upload」ボタン、または `platformio run --target upload`
+### コマンド
 
----
-
-## プロジェクト構成
-
-```
-platformio.ini        # PlatformIO 設定
-src/
-  main.cpp            # メインファームウェア
-  USBHIDKeyboard_JIS.h  # JIS キーボード用 HID キーコード定義
+```sh
+pio run
+pio run -t upload
+pio device monitor -b 115200
 ```
 
----
+## ディレクトリ構成
 
-## 使用ライブラリ
+```text
+.
+|- platformio.ini
+|- src/
+|  |- main.cpp
+|  |- USBHIDKeyboard_JIS.h
+|- include/
+|- lib/
+|- test/
+`- icons/
+```
 
-| ライブラリ                   | 用途                 |
-| ---------------------------- | -------------------- |
-| arduino-pico (内蔵 Keyboard) | USB HID キーボード   |
-| Adafruit NeoPixel            | WS2812 LED 制御      |
-| TinyUSB (arduino-pico 内蔵)  | USB HID レポート送信 |
+## 注意事項
+
+- マトリクス配線はチャタリングやゴースト対策のため、必要に応じてダイオード追加を検討してください。
+- 一部ショートカットは OS/アプリのキーボードレイアウト設定に依存します。
+- HID キーコードの追加・調整は USBHIDKeyboard_JIS.h を編集してください。
