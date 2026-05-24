@@ -1,94 +1,3 @@
-/*
-4x5 キーマトリクス
-Rows（出力）
-Row	GPIO
-R0	GP5
-R1	GP4
-R2	GP3
-R3	GP2
-
-
-Cols（入力_PULLUP）
-Col	GPIO
-C0	GP6
-C1	GP7
-C2	GP8
-C3	GP9
-C4	GP10
-
-┌────┬────┐────┐────┐
-│ESC │Save│    │    │
-├────┼────┼────┼────┤
-│Undo│Redo│Copy│Paste│
-├────┼────┼────┼────┤
-│Zoom-│Zoom+│Cut │Enter│
-├────┼────┼────┼────┤
-│ [  │  ] │Hand│Eye │
-├────┼────┼────┼────┤
-│Shift│Ctrl│Alt │Space│
-└────┴────┴────┴────┘
-
-// 固定キー
-┌─────┬─────┬─────┐─────┐─────┐
-│ ESC │ Copy│ Cut │Paste│  %1 │ %1はModeチェンジ。4Modeを順に切り替える。LEDの色を変える
-├─────┼─────┼─────┼─────┼─────┤
-│ Save│     │     │     │     │
-├─────│─────┼─────┼─────┼─────┤
-│ Redo│     │     │     │  MR │ MR Mouse Right//Click
-├─────│─────┼─────┼─────┼─────┤
-│ Undo│Shift│ Ctrl│ Alt │Space│
-└─────┴─────┴─────┴─────┴─────┘
-// PhotoShopのショートカット
-┌─────┬─────┬─────┐─────┐─────┐
-│ ESC │ Copy│ Cut │Paste│  %1 │
-├─────┼─────┼─────┼─────┼─────┤
-│  R  │Ctl+D│Ctl+A│S+C+I│Alt+Del│
-├─────│─────┼─────┼─────┼─────┤
-│ Redo│  M  │  V  │  H  │  MR │
-├─────│─────┼─────┼─────┼─────┤
-│ Undo│Shift│ Ctrl│ Alt │Space│
-└─────┴─────┴─────┴─────┴─────┘
-RE1 Ctrl+k+ Ctrl+k- Ctrl+0
-RE2 [ ] B
-// AfterEffectsのショートカット
-┌─────┬─────┬─────┐─────┐─────┐
-│ ESC │ Copy│ Cut │Paste│  %1 │
-├─────┼─────┼─────┼─────┼─────┤
-│  *  │Ctr+0│C+S+D│Ctr+D│  0  │
-├─────│─────┼─────┼─────┼─────┤
-│ Redo│C+A+0│  V  │  H  │  MR │
-├─────│─────┼─────┼─────┼─────┤
-│ Undo│Shift│ Ctrl│ Alt │Space│
-└─────┴─────┴─────┴─────┴─────┘
-ビューzo,,, zi....
-タイムラインzo--- zi^^^
-// Illustratorのショートカット
-┌─────┬─────┬─────┐─────┐─────┐
-│ ESC │ Copy│ Cut │Paste│  %1 │
-├─────┼─────┼─────┼─────┼─────┤
-│  I  │  P  │ S+C │ S++ │  -  │
-├─────│─────┼─────┼─────┼─────┤
-│ Redo│  A  │  V  │  H  │  MR │
-├─────│─────┼─────┼─────┼─────┤
-│ Undo│Shift│ Ctrl│ Alt │Space│
-└─────┴─────┴─────┴─────┴─────┘
-RE2 Shift+H V Shift+Ctrl+1
-RE1 Ctrl+k+ Ctrl+k- Ctrl+0
-
-
-
-ロータリーエンコーダ1
-Signal	GPIO
-CLK	GP11
-DT	GP12
-SW	GP13
-
-ロータリーエンコーダ2
-Signal	GPIO
-CLK	GP14
-DT	GP15
-SW	GP26
-*/
 #include <Arduino.h>
 #include <Keyboard.h>
 #include <Mouse.h>
@@ -99,6 +8,19 @@ SW	GP26
 #include "class/hid/hid_device.h"
 #include <Adafruit_NeoPixel.h>
 #include "USBHIDKeyboard_JIS.h"
+#include <LittleFS.h> // LittleFSを追加
+
+/*
+4x5 キーマトリクス (Row出力 / Col入力 反転対応版)
+Rows（出力） -> GP5, GP4, GP3, GP2
+Cols（入力_PULLUP） -> GP6, GP7, GP8, GP9, GP10
+
+ロータリーエンコーダ1 (Enc0)
+CLK: GP11, DT: GP12, SW: GP13
+
+ロータリーエンコーダ2 (Enc1)
+CLK: GP14, DT: GP15, SW: GP26
+*/
 
 // ============================================
 // WS2812
@@ -131,10 +53,12 @@ uint32_t COLOR_DARK_MAGENTA;
 uint32_t COLOR_DARK_CYAN;
 uint32_t COLOR_WHITE;
 uint32_t COLOR_GRAY;
+
 // ============================================
-// 型定義
+// 型定義・構造体
 // ============================================
-const uint8_t rowPins[4] = {5, 4, 3, 2};
+// const uint8_t rowPins[4] = {5, 4, 3, 2};
+const uint8_t rowPins[4] = {2, 3, 4, 5};
 const uint8_t colPins[5] = {6, 7, 8, 9, 10};
 
 enum ClickType
@@ -145,14 +69,13 @@ enum ClickType
   MOUSE_M = MOUSE_MIDDLE
 };
 
-struct KeyConfig
+struct __attribute__((packed)) KeyConfig
 {
   uint8_t modifier;
   uint8_t keycode;
   ClickType mouse;
 };
 
-// エンコーダの動的状態のみを管理する構造体
 struct RotaryEncoder
 {
   uint8_t pinA;
@@ -161,78 +84,53 @@ struct RotaryEncoder
   int lastStateA;
   bool swOldState;
 
-  // キュー処理用メンバ
-  int pulseQueue;       // 溜まったパルス数（正:右, 負:左）
-  uint32_t activeTimer; // キーを押し下げているタイマー
-  bool isKeyActive;     // 現在エンコーダ由来のキーがONか
-  KeyConfig activeCfg;  // 現在ONにしているキー設定
+  int pulseQueue;
+  uint32_t activeTimer;
+  bool isKeyActive;
+  KeyConfig activeCfg;
 };
 
 // モード切替用の特殊キー定義 (%1として使用)
 #define KEY_MODE_CHANGE 0xFF
-
-// ============================================
-// モード・キーマップ管理
-// ============================================
-enum ActiveMode
-{
-  MODE_PHOTOSHOP = 0,
-  MODE_AFTEREFFECTS,
-  MODE_ILLUSTRATOR,
-  NUM_MODES
-};
-uint8_t currentMode = MODE_PHOTOSHOP;
-
 #define ENCODER_COUNT 2
+#define MAX_LAYERS 8 // 最大レイヤー数を8に設定（メモリ空間に余裕あり）
+#define CONFIG_FILE_PATH "/keymap.bin"
 
-KeyConfig keyMaps[NUM_MODES][4][5] = {
-    {{{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
-     {{0, HID_KEY_R, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_A, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_I, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_DELETE, NONE}},
-     {{KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE}, {0, HID_KEY_M, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, HID_KEY_NONE, MOUSE_R}},
-     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}},
-    {{{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
-     {{0, HID_KEY_KP_ASTERISK, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_D, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE}, {0, HID_KEY_0, NONE}},
-     {{KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTALT, HID_KEY_0, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, HID_KEY_NONE, MOUSE_R}},
-     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}},
-    {{{0, HID_KEY_ESCAPE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE}, {0, KEY_MODE_CHANGE, NONE}},
-     {{0, HID_KEY_I, NONE}, {0, HID_KEY_P, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_C, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_KP_PLUS, NONE}, {0, HID_KEY_MINUS, NONE}},
-     {{KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE}, {0, HID_KEY_A, NONE}, {0, HID_KEY_V, NONE}, {0, HID_KEY_H, NONE}, {0, HID_KEY_NONE, MOUSE_R}},
-     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE}, {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE}, {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE}, {0, HID_KEY_SPACE, NONE}}}};
-
-KeyConfig encoderMaps[NUM_MODES][ENCODER_COUNT][3] = {
-    {// Enc0
-     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}},
-     // Enc1
-     {{0, HID_KEY_LEFTBRACE, NONE}, {0, HID_KEY_RIGHTBRACE, NONE}, {0, HID_KEY_B, NONE}}},
-    {// Enc0
-     {{0, HID_KEY_MINUS, NONE}, {0, HID_KEY_CARET, NONE}, {0, HID_KEY_NONE, NONE}},
-     // Enc1
-     {{0, HID_KEY_COMMA, NONE}, {0, HID_KEY_DOT, NONE}, {0, HID_KEY_NONE, NONE}}},
-    {// Enc0
-     {{KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE}},
-     // Enc1
-     {{KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_H, NONE}, {0, HID_KEY_V, NONE}, {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_1, NONE}}}};
-
-// constexpr int ENCODER_COUNT = sizeof(encoders) / sizeof(encoders[0]);
-
-// エンコーダーのハードウェア接続設定
-RotaryEncoder encoders[] = {
-    {11, 12, 13, LOW, true, 0, 0}, // エンコーダ1 (Enc0)
-    {14, 15, 26, LOW, true, 0, 0}  // エンコーダ2 (Enc1)};
+// 【新規仕様】1レイヤーの情報を内包する構造体
+struct __attribute__((packed)) LayerInfo
+{
+  char layerName[16]; // レイヤー名（PCアプリ連動用）
+  uint8_t ledR;       // モードLEDのRGB値
+  uint8_t ledG;
+  uint8_t ledB;
+  KeyConfig matrix[4][5];               // 4x5キーマトリクス
+  KeyConfig encoders[ENCODER_COUNT][3]; // エンコーダー2個の設定 [0:CW, 1:CCW, 2:SW]
 };
-bool keyState[4][5] = {false};
+
 // ============================================
-// 【新規】同時押し用 一括送信レポートバッファ
+// モード・キーマップ管理（動的可変対応）
+// ============================================
+uint8_t numActiveModes = 3; // 現在の有効レイヤー数（LittleFSから動的ロード）
+uint8_t currentMode = 0;    // インデックス管理（0スタート）
+
+// 最大数分でレイヤー配列をメモリ上に静的確保
+LayerInfo layers[MAX_LAYERS];
+
+RotaryEncoder encoders[] = {
+    {11, 12, 13, LOW, true, 0, 0, false, {0, 0, NONE}},
+    {14, 15, 26, LOW, true, 0, 0, false, {0, 0, NONE}}};
+bool keyState[4][5] = {false};
+
+// ============================================
+// 同時押し用 一括送信レポートバッファ
 // ============================================
 uint8_t currentReportModifier = 0;
 uint8_t currentReportKeys[6] = {0};
 
-// マウスボタン個別追跡用フラグ
 bool currentMouseL = false;
 bool currentMouseR = false;
 bool currentMouseM = false;
 
-// バッファに通常キーを安全に追加する関数（最大6個まで）
 void addKeyToReport(uint8_t keycode)
 {
   if (keycode == HID_KEY_NONE)
@@ -248,6 +146,7 @@ void addKeyToReport(uint8_t keycode)
     }
   }
 }
+
 void addMouseToReport(ClickType mouseButton)
 {
   if (mouseButton == MOUSE_L)
@@ -257,6 +156,7 @@ void addMouseToReport(ClickType mouseButton)
   if (mouseButton == MOUSE_M)
     currentMouseM = true;
 }
+
 // ============================================
 // LED制御関数
 // ============================================
@@ -266,23 +166,102 @@ void setLed(uint32_t color)
   led.show();
 }
 
+// 【仕様変更】LayerInfoのRGB値からLEDを動的更新
 void updateModeLED()
 {
-  switch (currentMode)
+  if (currentMode < numActiveModes)
   {
-  case MODE_PHOTOSHOP:
+    setLed(led.Color(layers[currentMode].ledR, layers[currentMode].ledG, layers[currentMode].ledB));
+  }
+  else
+  {
     setLed(COLOR_OFF);
-    break; // Photoshop: 青
-  case MODE_AFTEREFFECTS:
-    setLed(COLOR_DARK_BLUE);
-    break; // AfterEffects: マゼンタ
-  case MODE_ILLUSTRATOR:
-    setLed(COLOR_DARK_YELLOW);
-    break; // Illustrator: 黄
   }
 }
+
 // ============================================
-// HID送信コア関数（一括レポート送信仕様）
+// LittleFS 読み書き・シリアル通信処理
+// ============================================
+void loadConfigFromFlash()
+{
+  if (!LittleFS.begin())
+    return;
+  if (LittleFS.exists(CONFIG_FILE_PATH))
+  {
+    File f = LittleFS.open(CONFIG_FILE_PATH, "r");
+    if (f)
+    {
+      f.read(&numActiveModes, 1);                // 1バイト目に有効レイヤー数
+      f.read((uint8_t *)layers, sizeof(layers)); // 続いて構造体配列全体をロード
+      f.close();
+    }
+  }
+}
+
+void handleSerialCommunication()
+{
+  if (Serial.available() > 0)
+  {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+
+    // PCからの保存要求受付
+    if (cmd == "SAVE_CONFIG")
+    {
+      Serial.println("READY"); // 準備完了の返事
+
+      // 有効レイヤー数(1バイト)を受信
+      while (Serial.available() < 1)
+      {
+        tud_task();
+      }
+      Serial.readBytes(&numActiveModes, 1);
+      if (numActiveModes > MAX_LAYERS)
+        numActiveModes = MAX_LAYERS;
+
+      // LayerInfo構造体配列の生バイナリを受信
+      uint8_t *buf = (uint8_t *)layers;
+      size_t totalSize = sizeof(layers);
+      size_t received = 0;
+      while (received < totalSize)
+      {
+        tud_task();
+        if (Serial.available() > 0)
+        {
+          size_t amt = Serial.readBytes(buf + received, totalSize - received);
+          received += amt;
+        }
+      }
+
+      // LittleFSに即時書き込み
+      File f = LittleFS.open(CONFIG_FILE_PATH, "w");
+      if (f)
+      {
+        f.write(&numActiveModes, 1);
+        f.write((uint8_t *)layers, sizeof(layers));
+        f.close();
+        Serial.println("SUCCESS");
+      }
+      else
+      {
+        Serial.println("ERROR_FILE_OPEN");
+      }
+      currentMode = 0; // モードを先頭にリセット
+      updateModeLED();
+    }
+    // PCからの現在の設定吸い出し要求受付
+    else if (cmd == "LOAD_CONFIG")
+    {
+      // 「有効レイヤー数」＋「バイナリ全体」を一括でPCへエコーバック
+      Serial.write(&numActiveModes, 1);
+      Serial.write((uint8_t *)layers, sizeof(layers));
+      Serial.flush();
+    }
+  }
+}
+
+// ============================================
+// HID送信コア関数
 // ============================================
 void sendReportFinal()
 {
@@ -308,50 +287,7 @@ void sendReportFinal()
 
   tud_task();
 }
-// ============================================
-// HID送信コア関数
-// ============================================
-/*
-void sendHIDReport(uint8_t modifier, uint8_t keycode, ClickType mouseButton, bool isPressed)
-{
-  CoreMutex m(&__usb_mutex);
-  tud_task();
-  if (!__USBHIDReady())
-    return;
 
-  uint8_t keys[6] = {0};
-  if (isPressed)
-  {
-    keys[0] = keycode;
-  }
-  tud_hid_keyboard_report(__USBGetKeyboardReportID(), isPressed ? modifier : 0, keys);
-
-  if (mouseButton != NONE)
-  {
-    if (isPressed)
-    {
-      Mouse.press(mouseButton);
-    }
-    else
-    {
-      Mouse.release(mouseButton);
-    }
-  }
-
-  tud_task();
-  if (isPressed)
-  {
-    lastInputTime = millis();
-  }
-}
-
-void tapKey(KeyConfig cfg)
-{
-  sendHIDReport(cfg.modifier, cfg.keycode, cfg.mouse, true);
-  delay(10);
-  sendHIDReport(cfg.modifier, cfg.keycode, cfg.mouse, false);
-}
-*/
 // ============================================
 // 監視ロジック
 // ============================================
@@ -361,32 +297,30 @@ void updateEncoders()
   {
     auto &enc = encoders[i];
 
-    // --- 1. 回転のエッジ検出 (高速回転でもキューに溜めて絶対に取りこぼさない) ---
+    // --- 1. 回転のエッジ検出 ---
     int currentStateA = digitalRead(enc.pinA);
     if (currentStateA != enc.lastStateA && currentStateA == LOW)
     {
       if (digitalRead(enc.pinB) != currentStateA)
       {
         enc.pulseQueue++;
-      } // 右回転をストック
+      }
       else
       {
         enc.pulseQueue--;
-      } // 左回転をストック
+      }
     }
     enc.lastStateA = currentStateA;
 
-    // --- 2. ストックされたパルスの処理（キーのON/OFF管理） ---
+    // --- 2. パルス処理 ---
     if (enc.isKeyActive)
     {
-      // キーの押し下げ時間が20msを超えたら一旦離す（OSが認識するのに最適な時間）
       if (millis() - enc.activeTimer >= 20)
       {
         enc.isKeyActive = false;
       }
       else
       {
-        // 20ms経過するまでは、現在のキー状態を維持してバッファに載せ続ける
         currentReportModifier |= enc.activeCfg.modifier;
         addKeyToReport(enc.activeCfg.keycode);
         if (enc.activeCfg.mouse != NONE)
@@ -395,17 +329,16 @@ void updateEncoders()
     }
     else
     {
-      // キューに未処理の回転が溜まっていて、かつ前回のキーが解除されていれば次のパルスを処理
       if (enc.pulseQueue != 0)
       {
         if (enc.pulseQueue > 0)
         {
-          enc.activeCfg = encoderMaps[currentMode][i][0]; // CW
+          enc.activeCfg = layers[currentMode].encoders[i][0]; // CW (layers経由に変更)
           enc.pulseQueue--;
         }
         else
         {
-          enc.activeCfg = encoderMaps[currentMode][i][1]; // CCW
+          enc.activeCfg = layers[currentMode].encoders[i][1]; // CCW
           enc.pulseQueue++;
         }
 
@@ -413,7 +346,6 @@ void updateEncoders()
         enc.activeTimer = millis();
         lastInputTime = millis();
 
-        // 最初の1フレーム目としてバッファに載せる
         currentReportModifier |= enc.activeCfg.modifier;
         addKeyToReport(enc.activeCfg.keycode);
         if (enc.activeCfg.mouse != NONE)
@@ -421,11 +353,11 @@ void updateEncoders()
       }
     }
 
-    // --- 3. スイッチ（押し込み）検出 ---
+    // --- 3. スイッチ検出 ---
     bool swState = digitalRead(enc.pinSW);
     if (swState == LOW)
     {
-      KeyConfig cfg = encoderMaps[currentMode][i][2];
+      KeyConfig cfg = layers[currentMode].encoders[i][2]; // SW
       currentReportModifier |= cfg.modifier;
       addKeyToReport(cfg.keycode);
       if (cfg.mouse != NONE)
@@ -449,13 +381,14 @@ void updateKeyMatrix()
 
       if (isPressed)
       {
-        KeyConfig cfg = keyMaps[currentMode][r][c];
+        KeyConfig cfg = layers[currentMode].matrix[r][c]; // layers経由に変更
 
         if (cfg.keycode == KEY_MODE_CHANGE)
         {
           if (keyState[r][c] == false)
           {
-            currentMode = (currentMode + 1) % NUM_MODES;
+            // 動的な有効レイヤー数（numActiveModes）でループ処理
+            currentMode = (currentMode + 1) % numActiveModes;
             updateModeLED();
           }
         }
@@ -481,7 +414,6 @@ void sendMouseJiggle()
   delay(10);
   Mouse.move(-10, 0, 0);
 }
-
 void handleScreensaver()
 {
   if ((millis() - lastInputTime) >= SCREENSAVER_TIMEOUT_MS)
@@ -499,6 +431,106 @@ void handleScreensaver()
   }
 }
 
+// 元のハードコーディングされていたデフォルト設定を構造体に初期展開する関数
+void initDefaultKeymaps()
+{
+  numActiveModes = 3;
+  layers[0].ledR = 0;
+  layers[0].ledG = 0;
+  layers[0].ledB = 0; // 黒(消灯)
+  // Photoshop レイヤー設定 (Layer 0)
+  strcpy(layers[0].layerName, "Photoshop");
+  layers[0].matrix[0][0] = {0, HID_KEY_ESCAPE, NONE};
+  layers[0].matrix[0][1] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE};
+  layers[0].matrix[0][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE};
+  layers[0].matrix[0][3] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE};
+  layers[0].matrix[0][4] = {0, KEY_MODE_CHANGE, NONE};
+  layers[0].matrix[1][0] = {0, HID_KEY_R, NONE};
+  layers[0].matrix[1][1] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE};
+  layers[0].matrix[1][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_A, NONE};
+  layers[0].matrix[1][3] = {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_I, NONE};
+  layers[0].matrix[1][4] = {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_DELETE, NONE};
+  layers[0].matrix[2][0] = {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE};
+  layers[0].matrix[2][1] = {0, HID_KEY_M, NONE};
+  layers[0].matrix[2][2] = {0, HID_KEY_V, NONE};
+  layers[0].matrix[2][3] = {0, HID_KEY_H, NONE};
+  layers[0].matrix[2][4] = {0, HID_KEY_NONE, MOUSE_R};
+  layers[0].matrix[3][0] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE};
+  layers[0].matrix[3][1] = {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE};
+  layers[0].matrix[3][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE};
+  layers[0].matrix[3][3] = {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE};
+  layers[0].matrix[3][4] = {0, HID_KEY_SPACE, NONE};
+  layers[0].encoders[0][0] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE};
+  layers[0].encoders[0][1] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE};
+  layers[0].encoders[0][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE};
+  layers[0].encoders[1][0] = {0, HID_KEY_LEFTBRACE, NONE};
+  layers[0].encoders[1][1] = {0, HID_KEY_RIGHTBRACE, NONE};
+  layers[0].encoders[1][2] = {0, HID_KEY_B, NONE};
+
+  // AfterEffects レイヤー設定 (Layer 1)
+  strcpy(layers[1].layerName, "AfterEffects");
+  layers[1].ledR = 0;
+  layers[1].ledG = 0;
+  layers[1].ledB = 64; // 暗い青
+  layers[1].matrix[0][0] = {0, HID_KEY_ESCAPE, NONE};
+  layers[1].matrix[0][1] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE};
+  layers[1].matrix[0][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE};
+  layers[1].matrix[0][3] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE};
+  layers[1].matrix[0][4] = {0, KEY_MODE_CHANGE, NONE};
+  layers[1].matrix[1][0] = {0, HID_KEY_KP_ASTERISK, NONE};
+  layers[1].matrix[1][1] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE};
+  layers[1].matrix[1][2] = {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_D, NONE};
+  layers[1].matrix[1][3] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_D, NONE};
+  layers[1].matrix[1][4] = {0, HID_KEY_0, NONE};
+  layers[1].matrix[2][0] = {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE};
+  layers[1].matrix[2][1] = {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTALT, HID_KEY_0, NONE};
+  layers[1].matrix[2][2] = {0, HID_KEY_V, NONE};
+  layers[1].matrix[2][3] = {0, HID_KEY_H, NONE};
+  layers[1].matrix[2][4] = {0, HID_KEY_NONE, MOUSE_R};
+  layers[1].matrix[3][0] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE};
+  layers[1].matrix[3][1] = {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE};
+  layers[1].matrix[3][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE};
+  layers[1].matrix[3][3] = {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE};
+  layers[1].matrix[3][4] = {0, HID_KEY_SPACE, NONE};
+  layers[1].encoders[0][0] = {0, HID_KEY_MINUS, NONE};
+  layers[1].encoders[0][1] = {0, HID_KEY_CARET, NONE};
+  layers[1].encoders[0][2] = {0, HID_KEY_NONE, NONE};
+  layers[1].encoders[1][0] = {0, HID_KEY_COMMA, NONE};
+  layers[1].encoders[1][1] = {0, HID_KEY_DOT, NONE};
+  layers[1].encoders[1][2] = {0, HID_KEY_NONE, NONE};
+
+  // Illustrator レイヤー設定 (Layer 2)
+  strcpy(layers[2].layerName, "Illustrator");
+  layers[2].ledR = 64;
+  layers[2].ledG = 64;
+  layers[2].ledB = 0; // 暗い黄
+  layers[2].matrix[0][0] = {0, HID_KEY_ESCAPE, NONE};
+  layers[2].matrix[0][1] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_C, NONE};
+  layers[2].matrix[0][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_X, NONE};
+  layers[2].matrix[0][3] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_V, NONE};
+  layers[2].matrix[0][4] = {0, KEY_MODE_CHANGE, NONE};
+  layers[2].matrix[1][0] = {0, HID_KEY_I, NONE};
+  layers[2].matrix[1][1] = {0, HID_KEY_P, NONE};
+  layers[2].matrix[1][2] = {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_C, NONE};
+  layers[2].matrix[1][3] = {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_KP_PLUS, NONE};
+  layers[2].matrix[1][4] = {0, HID_KEY_MINUS, NONE};
+  layers[2].matrix[2][0] = {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_Z, NONE};
+  layers[2].matrix[2][1] = {0, HID_KEY_A, NONE};
+  layers[2].matrix[2][2] = {0, HID_KEY_V, NONE};
+  layers[2].matrix[2][3] = {0, HID_KEY_H, NONE};
+  layers[2].matrix[2][4] = {0, HID_KEY_NONE, MOUSE_R};
+  layers[2].matrix[3][0] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_Z, NONE};
+  layers[2].matrix[3][1] = {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_NONE, NONE};
+  layers[2].matrix[3][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_NONE, NONE};
+  layers[2].matrix[3][3] = {KEYBOARD_MODIFIER_LEFTALT, HID_KEY_NONE, NONE};
+  layers[2].matrix[3][4] = {0, HID_KEY_SPACE, NONE};
+  layers[2].encoders[0][0] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_PLUS, NONE};
+  layers[2].encoders[0][1] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_KP_MINUS, NONE};
+  layers[2].encoders[0][2] = {KEYBOARD_MODIFIER_LEFTCTRL, HID_KEY_0, NONE};
+  layers[2].encoders[1][0] = {KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_H, NONE};
+  layers[2].encoders[1][1] = {0, HID_KEY_V, NONE};
+  layers[2].encoders[1][2] = {KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_LEFTSHIFT, HID_KEY_1, NONE};
+}
 // ============================================
 // Setup / Loop
 // ============================================
@@ -519,11 +551,17 @@ void setup()
   COLOR_DARK_YELLOW = led.Color(64, 64, 0);
   COLOR_DARK_MAGENTA = led.Color(64, 0, 64);
   COLOR_DARK_CYAN = led.Color(0, 64, 64);
-  COLOR_CYAN = led.Color(0, 255, 255);
   COLOR_WHITE = led.Color(255, 255, 255);
   COLOR_GRAY = led.Color(64, 64, 64);
   setLed(COLOR_RED);
+
   Serial.begin(115200);
+
+  // 初期値の代入（LittleFSにファイルが無い場合の一時退避用）
+  initDefaultKeymaps();
+
+  // LittleFSから前回保存したキーマップ設定を復元
+  loadConfigFromFlash();
 
   for (auto &enc : encoders)
   {
@@ -553,6 +591,9 @@ void setup()
 
 void loop()
 {
+  // 0. シリアル通信経由のPC側アプリからの読み書き要求を処理
+  handleSerialCommunication();
+
   // 1. 毎フレームレポートバッファをリセット
   currentReportModifier = 0;
   memset(currentReportKeys, 0, sizeof(currentReportKeys));
