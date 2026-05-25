@@ -39,26 +39,13 @@ uint32_t lastInputTime = 0;
 // 色定義
 // ============================================
 uint32_t COLOR_OFF;
-uint32_t COLOR_RED;
-uint32_t COLOR_GREEN;
-uint32_t COLOR_BLUE;
-uint32_t COLOR_YELLOW;
-uint32_t COLOR_MAGENTA;
-uint32_t COLOR_CYAN;
-uint32_t COLOR_DARK_RED;
-uint32_t COLOR_DARK_GREEN;
-uint32_t COLOR_DARK_BLUE;
-uint32_t COLOR_DARK_YELLOW;
-uint32_t COLOR_DARK_MAGENTA;
-uint32_t COLOR_DARK_CYAN;
-uint32_t COLOR_WHITE;
-uint32_t COLOR_GRAY;
 
 // ============================================
 // 型定義・構造体
 // ============================================
-// const uint8_t rowPins[4] = {5, 4, 3, 2};
-const uint8_t rowPins[4] = {2, 3, 4, 5};
+// キーマトリクスのピン配置 誤配線があったため、行と列のピン番号を入れ替え
+const uint8_t rowPins[4] = {5, 4, 3, 2};
+// const uint8_t rowPins[4] = {2, 3, 4, 5};
 const uint8_t colPins[5] = {6, 7, 8, 9, 10};
 
 enum ClickType
@@ -165,7 +152,16 @@ void setLed(uint32_t color)
   led.setPixelColor(0, color);
   led.show();
 }
-
+void blinkLed(uint32_t color, int times, int delayMs)
+{
+  for (int i = 0; i < times; i++)
+  {
+    setLed(color);
+    delay(delayMs);
+    setLed(COLOR_OFF);
+    delay(delayMs);
+  }
+}
 // 【仕様変更】LayerInfoのRGB値からLEDを動的更新
 void updateModeLED()
 {
@@ -241,10 +237,12 @@ void handleSerialCommunication()
         f.write((uint8_t *)layers, sizeof(layers));
         f.close();
         Serial.println("SUCCESS");
+        blinkLed(led.Color(0, 255, 0), 3, 200);
       }
       else
       {
         Serial.println("ERROR_FILE_OPEN");
+        blinkLed(led.Color(255, 0, 0), 3, 200);
       }
       currentMode = 0; // モードを先頭にリセット
       updateModeLED();
@@ -256,6 +254,8 @@ void handleSerialCommunication()
       Serial.write(&numActiveModes, 1);
       Serial.write((uint8_t *)layers, sizeof(layers));
       Serial.flush();
+      blinkLed(led.Color(0, 0, 255), 3, 200);
+      updateModeLED();
     }
   }
 }
@@ -419,11 +419,11 @@ void handleScreensaver()
   if ((millis() - lastInputTime) >= SCREENSAVER_TIMEOUT_MS)
   {
     uint32_t prevColor = led.getPixelColor(0);
-    setLed(COLOR_OFF);
+    setLed(led.Color(0, 0, 0));
     delay(100);
-    setLed(COLOR_WHITE);
+    setLed(led.Color(255, 255, 255));
     delay(100);
-    setLed(COLOR_OFF);
+    setLed(led.Color(0, 0, 0));
     delay(100);
     setLed(prevColor);
     sendMouseJiggle();
@@ -539,21 +539,7 @@ void setup()
   led.begin();
 
   COLOR_OFF = led.Color(0, 0, 0);
-  COLOR_RED = led.Color(255, 0, 0);
-  COLOR_GREEN = led.Color(0, 255, 0);
-  COLOR_BLUE = led.Color(0, 0, 255);
-  COLOR_YELLOW = led.Color(255, 255, 0);
-  COLOR_MAGENTA = led.Color(255, 0, 255);
-  COLOR_CYAN = led.Color(0, 255, 255);
-  COLOR_DARK_RED = led.Color(64, 0, 0);
-  COLOR_DARK_GREEN = led.Color(0, 64, 0);
-  COLOR_DARK_BLUE = led.Color(0, 0, 64);
-  COLOR_DARK_YELLOW = led.Color(64, 64, 0);
-  COLOR_DARK_MAGENTA = led.Color(64, 0, 64);
-  COLOR_DARK_CYAN = led.Color(0, 64, 64);
-  COLOR_WHITE = led.Color(255, 255, 255);
-  COLOR_GRAY = led.Color(64, 64, 64);
-  setLed(COLOR_RED);
+  setLed(led.Color(255, 0, 0));
 
   Serial.begin(115200);
 
@@ -580,7 +566,7 @@ void setup()
 
   for (int i = 0; i < 4; i++)
   {
-    setLed(COLOR_GREEN);
+    setLed(led.Color(0, 255, 0));
     delay(150);
     setLed(COLOR_OFF);
     delay(150);
